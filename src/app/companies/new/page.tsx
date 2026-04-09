@@ -14,17 +14,18 @@ export default function NewCompanyPage() {
   const router = useRouter()
   const supabase = createClient()
   const [step, setStep] = useState<'form'|'loading'|'areas'|'generating'>('form')
-  const [formData, setFormData] = useState({ name: '', industry: '', size: '', description: '' })
+  const [formData, setFormData] = useState({ name: '', industry: '', size: '', description: '', websiteUrl: '' })
   const [suggestedAreas, setSuggestedAreas] = useState<IdentifiedArea[]>([])
   const [selectedAreas, setSelectedAreas] = useState<Set<number>>(new Set())
   const [businessSummary, setBusinessSummary] = useState('')
   const [showAddArea, setShowAddArea] = useState(false)
   const [customAreaName, setCustomAreaName] = useState('')
   const [fetchingUrl, setFetchingUrl] = useState(false)
+  const [urlFetched, setUrlFetched] = useState(false)
 
   const handleFetchUrl = async () => {
-    const url = formData.description.trim()
-    if (!url.startsWith('http')) return
+    const url = formData.websiteUrl.trim()
+    if (!url) return
     setFetchingUrl(true)
     try {
       const res = await fetch('/api/ai/fetch-url', {
@@ -35,6 +36,7 @@ export default function NewCompanyPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       setFormData(p => ({ ...p, description: data.content }))
+      setUrlFetched(true)
       toast.success('Web načten a analyzován!')
     } catch (err: any) {
       toast.error('Nepodařilo se načíst web: ' + err.message)
@@ -69,11 +71,7 @@ export default function NewCompanyPage() {
     if (!customAreaName.trim()) return
     const color = AREA_COLORS[suggestedAreas.length % AREA_COLORS.length]
     const newArea: IdentifiedArea = { name: customAreaName, description: 'Vlastní oblast', icon: '📋', color }
-    setSuggestedAreas(prev => {
-      const next = [...prev, newArea]
-      setSelectedAreas(s => new Set([...s, next.length - 1]))
-      return next
-    })
+    setSuggestedAreas(prev => { const next = [...prev, newArea]; setSelectedAreas(s => new Set([...s, next.length - 1])); return next })
     setCustomAreaName('')
     setShowAddArea(false)
     toast.success(`Oblast "${customAreaName}" přidána`)
@@ -83,11 +81,7 @@ export default function NewCompanyPage() {
     if (suggestedAreas.find(a => a.name === name)) { toast('Tato oblast už je v seznamu'); return }
     const color = AREA_COLORS[suggestedAreas.length % AREA_COLORS.length]
     const newArea: IdentifiedArea = { name, description: 'Přidaná oblast', icon: '📋', color }
-    setSuggestedAreas(prev => {
-      const next = [...prev, newArea]
-      setSelectedAreas(s => new Set([...s, next.length - 1]))
-      return next
-    })
+    setSuggestedAreas(prev => { const next = [...prev, newArea]; setSelectedAreas(s => new Set([...s, next.length - 1])); return next })
     setShowAddArea(false)
     toast.success(`Oblast "${name}" přidána`)
   }
@@ -149,8 +143,9 @@ export default function NewCompanyPage() {
         <form onSubmit={handleAnalyze} className="glass" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div>
             <label className="label">Název firmy *</label>
-            <input className="input" placeholder="Např. Talkey s.r.o." value={formData.name} onChange={e => setFormData(p => ({ ...p, name: e.target.value }))} required />
+            <input className="input" placeholder="Např. Talkey a.s." value={formData.name} onChange={e => setFormData(p => ({ ...p, name: e.target.value }))} required />
           </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <div>
               <label className="label">Odvětví</label>
@@ -167,24 +162,36 @@ export default function NewCompanyPage() {
               </select>
             </div>
           </div>
+
+          {/* Web URL field */}
           <div>
-            <label className="label">Popis firmy nebo URL webu *</label>
-            <div style={{ position: 'relative' }}>
-              <textarea className="input" rows={5}
-                placeholder="Popiš co firma dělá... nebo vlož URL webu (https://...) a klikni Načíst web"
-                value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))}
-                required style={{ minHeight: '140px', paddingRight: formData.description.startsWith('http') ? '120px' : '14px' }} />
-              {formData.description.startsWith('http') && (
-                <button type="button" onClick={handleFetchUrl} disabled={fetchingUrl}
-                  style={{ position: 'absolute', right: '10px', top: '10px', padding: '6px 12px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontFamily: 'var(--font-body)' }}>
-                  {fetchingUrl ? '...' : '🌐 Načíst web'}
-                </button>
-              )}
+            <label className="label">Web firmy <span style={{ color: 'var(--text-dim)', fontWeight: 400 }}>(volitelné — AI načte a analyzuje obsah)</span></label>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <input className="input" placeholder="https://www.firma.cz" value={formData.websiteUrl}
+                onChange={e => { setFormData(p => ({ ...p, websiteUrl: e.target.value })); setUrlFetched(false) }}
+                style={{ flex: 1 }} />
+              <button type="button" onClick={handleFetchUrl} disabled={fetchingUrl || !formData.websiteUrl}
+                className="btn btn-ghost" style={{ flexShrink: 0, minWidth: '120px', justifyContent: 'center' }}>
+                {fetchingUrl ? <span className="spinner" style={{ width: '14px', height: '14px' }} /> : urlFetched ? '✓ Načteno' : '🌐 Načíst web'}
+              </button>
             </div>
-            <p style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: '6px' }}>
-              Tip: Vlož URL webu firmy a AI automaticky načte a analyzuje obsah
-            </p>
+            {urlFetched && (
+              <p style={{ fontSize: '12px', color: 'var(--green)', marginTop: '6px' }}>
+                ✓ Web byl úspěšně analyzován a popis byl automaticky vyplněn
+              </p>
+            )}
           </div>
+
+          {/* Description */}
+          <div>
+            <label className="label">Popis firmy a byznysu *</label>
+            <textarea className="input" rows={5}
+              placeholder="Popiš co firma dělá, jak funguje, co prodává, kdo jsou zákazníci, jak vypadá typická zakázka od poptávky po dodání..."
+              value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))}
+              required style={{ minHeight: '140px' }} />
+            {urlFetched && <p style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: '4px' }}>Automaticky vyplněno z webu — můžeš upravit nebo doplnit</p>}
+          </div>
+
           <button type="submit" className="btn btn-primary" style={{ alignSelf: 'flex-start', padding: '12px 28px' }}>
             Analyzovat s AI →
           </button>
@@ -212,32 +219,30 @@ export default function NewCompanyPage() {
               Vyber oblasti které chceš zpracovat — AI pak vygeneruje procesy pro každou z nich
             </p>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px', marginBottom: '24px' }}>
               {suggestedAreas.map((area, i) => (
                 <div key={i} onClick={() => setSelectedAreas(prev => { const next = new Set(prev); next.has(i) ? next.delete(i) : next.add(i); return next })}
                   style={{ padding: '16px', borderRadius: 'var(--radius-sm)', cursor: 'pointer', border: `2px solid ${selectedAreas.has(i) ? area.color : 'var(--border)'}`, background: selectedAreas.has(i) ? `${area.color}15` : 'var(--bg3)', transition: 'all 0.15s', position: 'relative' }}>
-                  {!['area-0','area-1'].includes(`area-${i}`) && suggestedAreas.length > 1 && (
-                    <button onClick={e => { e.stopPropagation(); setSuggestedAreas(prev => { const next = prev.filter((_, idx) => idx !== i); setSelectedAreas(s => { const ns = new Set<number>(); s.forEach(v => { if (v < i) ns.add(v); else if (v > i) ns.add(v - 1) }); return ns }); return next }) }}
-                      style={{ position: 'absolute', top: '6px', right: '8px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', fontSize: '16px', lineHeight: 1 }}>×</button>
-                  )}
+                  <button onClick={e => { e.stopPropagation(); setSuggestedAreas(prev => { const next = prev.filter((_, idx) => idx !== i); setSelectedAreas(s => { const ns = new Set<number>(); s.forEach(v => { if (v < i) ns.add(v); else if (v > i) ns.add(v - 1) }); return ns }); return next }) }}
+                    style={{ position: 'absolute', top: '6px', right: '8px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', fontSize: '16px', lineHeight: 1 }}>×</button>
                   <div style={{ fontSize: '24px', marginBottom: '8px' }}>{area.icon}</div>
                   <div style={{ fontWeight: 600, fontSize: '14px', marginBottom: '4px', color: selectedAreas.has(i) ? area.color : 'var(--text)' }}>{area.name}</div>
                   <div style={{ fontSize: '12px', color: 'var(--text-dim)' }}>{area.description}</div>
                 </div>
               ))}
 
-              {/* Add area button */}
-              <div style={{ padding: '16px', borderRadius: 'var(--radius-sm)', border: '2px dashed var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100px', gap: '8px' }}>
+              <div style={{ padding: '16px', borderRadius: 'var(--radius-sm)', border: '2px dashed var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '120px', gap: '8px' }}>
                 {showAddArea ? (
-                  <div style={{ width: '100%' }}>
+                  <div style={{ width: '100%' }} onClick={e => e.stopPropagation()}>
                     <select className="input" style={{ marginBottom: '8px', fontSize: '12px', padding: '6px 10px' }}
                       onChange={e => { if (e.target.value) handleAddFromDropdown(e.target.value) }} defaultValue="">
-                      <option value="">Vybrat oblast...</option>
+                      <option value="">Vybrat z předvoleb...</option>
                       {EXTRA_AREAS.filter(a => !suggestedAreas.find(s => s.name === a)).map(a => <option key={a} value={a}>{a}</option>)}
                     </select>
                     <div style={{ display: 'flex', gap: '6px' }}>
                       <input className="input" placeholder="Nebo vlastní název..." value={customAreaName}
-                        onChange={e => setCustomAreaName(e.target.value)} style={{ fontSize: '12px', padding: '6px 10px' }}
+                        onChange={e => setCustomAreaName(e.target.value)}
+                        style={{ fontSize: '12px', padding: '6px 10px' }}
                         onKeyDown={e => e.key === 'Enter' && handleAddCustomArea()} />
                       <button onClick={handleAddCustomArea} className="btn btn-primary" style={{ padding: '6px 10px', fontSize: '12px', flexShrink: 0 }}>+</button>
                     </div>
