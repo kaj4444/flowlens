@@ -15,9 +15,9 @@
   --text: #0a0a0f;
   --text-muted: #5a5878;
   --text-dim: #9898b0;
-  --accent: #7c6ff7;
-  --accent-light: #9d94f9;
-  --accent-dim: rgba(124, 111, 247, 0.15);
+  --accent: #5b4fd4;
+  --accent-light: #4a3fc7;
+  --accent-dim: rgba(91, 79, 212, 0.1);
   --accent-glow: rgba(124, 111, 247, 0.3);
   --green: #4ade80;
   --amber: #fbbf24;
@@ -57,7 +57,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .glass {
-  background: rgba(30, 30, 46, 0.6);
+  background: rgba(240, 240, 248, 0.8);
   backdrop-filter: blur(20px);
   border: 1px solid var(--border);
   border-radius: var(--radius);
